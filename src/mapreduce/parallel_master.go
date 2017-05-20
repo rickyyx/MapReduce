@@ -54,9 +54,28 @@ func (m *ParallelMaster) Start() {
 	m.rpcListener = startMasterRPCServer(m)
 	// Don't remove the code above here.
 
+	// Each input as one job
+	numMapJobs := len(m.InputFileNames)
 	// FIXME: Create a buffered channel and send it each map task argument
 	// structure. Then, call `schedule` with the channel as input. Do the same
 	// for reduce tasks afterwards.
+
+	// schedule maps
+	mapCh := make(chan TaskArgs, numMapJobs)
+	// Populate channels
+
+	for mN, job := range m.InputFileNames {
+		mapCh <- TaskArgs(&DoMapArgs{job, uint(mN), m.NumReducers}) /* Mapper Num 0 as dummy */
+	}
+	m.schedule(mapCh)
+	fmt.Printf("All Map Tasks have been executed\n")
+	// Map tasks completed
+	rCh := make(chan TaskArgs, m.NumReducers)
+	for rN := uint(0); rN < m.NumReducers; rN++ {
+		// Atomic totalWorkers?
+		rCh <- TaskArgs(&DoReduceArgs{rN, uint(numMapJobs)})
+	}
+	m.schedule(rCh)
 
 	// Don't remove the code below here.
 	m.Shutdown()
@@ -67,8 +86,31 @@ func (m *ParallelMaster) Start() {
 // Blocks until all the work with arguments in `tasks` has been completed.
 func (m *ParallelMaster) schedule(tasks chan TaskArgs) {
 	// FIXME: Use `callWorker` to send an RPC (named `task.TaskName()`) to free
-	// workers until all tasks have been completed. Watch out for failing
-	// workers!
+
+	nJobDone, nAllJob := uint32(0), uint32(len(tasks))
+	for {
+		//	fmt.Printf("Jobs done %d\n", nJobDone)
+		select {
+		case task := <-tasks:
+			go func() {
+				worker := <-m.freeWorkers
+				ok := callWorker(worker, task.TaskName(), task, new(interface{}))
+				// Handle failures
+				if !ok {
+					tasks <- task
+				} else {
+					//Increment Jobs Done number
+					atomic.AddUint32(&nJobDone, 1)
+					//				fmt.Printf("Job Done %v\n", task)
+				}
+				m.freeWorkers <- worker
+			}()
+		default:
+			if atomic.LoadUint32(&nJobDone) == nAllJob {
+				return
+			}
+		}
+	}
 }
 
 // Merges the output of all reduce tasks into one file. Returns the filename for

@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 
-verbose=false
-goflags=""
+verbose=true
+goflags="-v"
 if [[ $1 = "-v" ]]; then
   verbose=true
   goflags="-v"
@@ -112,15 +112,16 @@ function test_ii() {
 
 function test_pr() {
   build_run_bin "pagerank" data/input/pr-input-*.txt
+  #build_run_bin "pagerank" data/input/tiny-pr-input.txt
   check_output "pagerank" "pr" "sort -k2,2 -srn | cut -c-13 | head -n 15"
 }
 
-run_test 1 go test mapreduce --cwd="$PWD" -run SequentialNoMerge $goflags
-run_test 2 go test mapreduce --cwd="$PWD" -run FullSequential $goflags
-run_test 3 test_wc
-run_test 4 go test mapreduce --cwd="$PWD" -run Parallel $goflags
-run_test 5 test_ii
-# run_test 6 test_pr # TODO: Uncomment me for extra credit phase.
+#run_test 1 go test mapreduce --cwd="$PWD" -run SequentialNoMerge $goflags
+#run_test 2 go test mapreduce --cwd="$PWD" -run FullSequential $goflags
+#run_test 3 test_wc
+#run_test 4 go test mapreduce --cwd="$PWD" -run Parallel $goflags
+#run_test 5 test_ii
+ run_test 6 test_pr # TODO: Uncomment me for extra credit phase.
 
 if [ $failed -eq 0 ]; then
   echo -e "${KGRN}Unit tests completed successfully.${KNRM}"

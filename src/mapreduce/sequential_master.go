@@ -37,6 +37,20 @@ func (m *SequentialMaster) Start() {
 	m.active = true
 	// Don't remove the code above here.
 
+	// Crate Worker
+	w := NewWorker(m.JobName, m.MapF, m.ReduceF)
+	w.Start()
+
+	//Map
+	for _, fileInput := range m.InputFileNames {
+		w.DoMap(fileInput, 0, m.NumReducers)
+	}
+	//Reduce
+	for i := uint(0); i < m.NumReducers; i++ {
+		w.DoReduce(i, uint(1))
+	}
+	w.Shutdown()
+
 	// FIXME: Create a single worker and ask it to perform all of the map tasks
 	// followed by all of the reduce tasks. There is one map task per input
 	// file, and `m.NumReducers` number of reduce tasks.

@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	mr "mapreduce"
+	"strings"
+	"unicode"
 )
 
 // The mapping function is called once for each piece of the input. In this
@@ -9,8 +13,16 @@ import (
 // value is the file's contents. The return value should be a slice of key/value
 // pairs, each represented by a mapreduce.KeyValue.
 func mapF(fileName string, contents string) (res []mr.KeyValue) {
-	// FIXME: Implement me.
+	words := strings.FieldsFunc(contents, func(c rune) bool { return !unicode.IsLetter(c) })
+	wordMap := make(map[string]bool)
 
+	for _, word := range words {
+		wordMap[word] = true
+	}
+
+	for word, _ := range wordMap {
+		res = append(res, mr.KeyValue{word, fileName})
+	}
 	return
 }
 
@@ -19,8 +31,16 @@ func mapF(fileName string, contents string) (res []mr.KeyValue) {
 // should be a single output value for that key.
 func reduceF(key string, values []string) string {
 	// FIXME: Implement me.
+	var count int
+	var buffer bytes.Buffer
+	for _, file := range values {
+		count++
+		buffer.WriteString(file)
+		buffer.WriteString(",")
+	}
 
-	return ""
+	//remove the trailing ,
+	return fmt.Sprintf("%d %s", count, strings.TrimSuffix(buffer.String(), ","))
 }
 
 // Parses the command line arguments and runs the computation. "Running the

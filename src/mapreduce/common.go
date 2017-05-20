@@ -29,6 +29,7 @@ type KeyValue struct {
 // there is an error, panics with the error along with the message `msg`.
 func checkErr(err error, msg string) {
 	if err != nil {
+
 		panicMessage := fmt.Sprintf("Error: %s\n%v", msg, err)
 		panic(panicMessage)
 	}

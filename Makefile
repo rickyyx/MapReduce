@@ -16,7 +16,7 @@ invertedindex: $(call rwildcard,src/invertedindex/,*.go) $(LIB_FILES)
 	$(GO) build invertedindex
 
 pagerank: $(call rwildcard,src/pagerank/,*.go) $(LIB_FILES)
-	$(GO) build pagerank
+	$(GO) build -gcflags '-N -l' pagerank 
 
 test:
 	@GOPATH="$(PWD)" ./test.sh

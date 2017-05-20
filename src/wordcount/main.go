@@ -1,7 +1,11 @@
 package main
 
 import (
+	"fmt"
 	mr "mapreduce"
+	"strconv"
+	"strings"
+	"unicode"
 )
 
 // The mapping function is called once for each piece of the input. In this
@@ -9,8 +13,16 @@ import (
 // value is the file's contents. The return value should be a slice of key/value
 // pairs, each represented by a mapreduce.KeyValue.
 func mapF(fileName string, contents string) (res []mr.KeyValue) {
-	// FIXME: Implement me.
+	words := strings.FieldsFunc(contents, func(c rune) bool { return !unicode.IsLetter(c) })
+	wordCount := make(map[string]int)
 
+	for _, word := range words {
+		wordCount[word]++
+	}
+
+	for word, count := range wordCount {
+		res = append(res, mr.KeyValue{word, strconv.Itoa(count)})
+	}
 	return
 }
 
@@ -18,9 +30,16 @@ func mapF(fileName string, contents string) (res []mr.KeyValue) {
 // of that key's string value (merged across all inputs). The return value
 // should be a single output value for that key.
 func reduceF(key string, values []string) string {
-	// FIXME: Implement me.
-
-	return ""
+	var count int64
+	for _, value := range values {
+		x, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			fmt.Errorf("Failed parsed integer: %s\n", value)
+			continue
+		}
+		count += x
+	}
+	return strconv.FormatInt(count, 10)
 }
 
 // Parses the command line arguments and runs the computation. "Running the

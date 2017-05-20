@@ -98,6 +98,9 @@ func ParseCmdLine() (NodeType, uint, []string) {
 // 1) Parsing the command line arguments to see what kind of node this is.
 // 2) Starting the appropriate communication channels.
 func Run(jobName string, mapF MapFunction, reduceF ReduceFunction) {
+
+	fmt.Printf("Running now %s", jobName)
+
 	nodeType, reducers, inputFileNames := ParseCmdLine()
 	switch nodeType {
 	case WorkerNode:
