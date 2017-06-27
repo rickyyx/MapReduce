@@ -8,6 +8,7 @@ _obj
 _test
 private
 
+
 # Architecture specific extensions/prefixes
 *.[568vq]
 [568vq].out
@@ -39,3 +40,4 @@ _testmain.go
 # Output data
 /data/output/mr*
 /data/output/diff*
+/data/input/tmp*
