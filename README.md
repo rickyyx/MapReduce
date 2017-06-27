@@ -47,5 +47,5 @@
 ```
 
 
-###Acknowledgement
+### Acknowledgement
 Skeleton code credit to [Sergio](https://sergio.bz) from CS240 @ Stanford. 
