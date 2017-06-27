@@ -27,9 +27,11 @@ const (
 // Input: fileName, fileContent
 // Ouput: Key: v, Value: PR/n
 func mapF(fileName string, contents string) (res []mr.KeyValue) {
+	//Split the content into lines
 	lines := strings.Split(contents, "\n")
 	for _, line := range lines {
 		if len(line) > 0 {
+			//p: page p, PRp: PR for p, vs: outbound links for p
 			p, PRp, vs := parseInputLine(line)
 
 			//lp as the number of outbound links for page p
@@ -44,22 +46,22 @@ func mapF(fileName string, contents string) (res []mr.KeyValue) {
 			res = append(res, mr.KeyValue{p, dumpP})
 		}
 	}
-	fmt.Printf("Map sending [%v]\n", res)
 	return
 }
 
+//parseInputLine is a utility method that parses the input line into
+//the page, the PR of the page, and the outbound of the page
 func parseInputLine(line string) (string, string, []string) {
 	tokens := strings.Split(line, ": ")
-	fmt.Printf("Line:\n%s\n", line)
 	p := strings.TrimSpace(tokens[0])
 
 	prpAndVs := strings.SplitN(tokens[1], ", ", 2)
 	prp := strings.TrimSpace(prpAndVs[0])
-
 	vs := strings.Split(prpAndVs[1], ", ")
 	return p, prp, vs
 }
 
+//calculatePR calculates the PR contributed by each outbound link
 func calculatePR(pr string, L int) string {
 	val, err := strconv.ParseFloat(pr, 64)
 	checkErr(err, "Cannot parse value to float: ", pr)
@@ -74,10 +76,10 @@ func calculatePR(pr string, L int) string {
 func reduceF(key string, values []string) (res string) {
 	newPr := reducePRs(values)
 	res = strconv.FormatFloat(newPr, 'f', -1, 64)
-	fmt.Printf("Reduce sending [%v]\n -----from [%v]\n", res, values)
 	return
 }
 
+//reducePRs sums all the PRs for a specific page.
 func reducePRs(values []string) float64 {
 	var sumPr float64
 
@@ -93,10 +95,6 @@ func reducePRs(values []string) float64 {
 
 // Parses the command line arguments and runs the computation.
 func main() {
-	// TODO: Implement this function for Page Rank. You won't be able to use
-	// `run` directly here since you'll need to iterative compute the page rank.
-	// See mr/parse_cmd_line.go for an example on how to use the library
-	// directly. Ignore the node type: you can choose what you do.
 
 	// Some useful code, to get started:
 	jobName := "pagerank"
@@ -106,27 +104,33 @@ func main() {
 
 	//Process the inputfiles, to get the outbound links for each page
 	pageLinks := processLinks(inputFileNames)
+
+	//Copy inputs into a /tmp folder which will be modifed by each iteration
 	inputFileNames = copyInputs(inputFileNames)
 
 	// numMappers equal to numInputFiles
 	numMappers := len(inputFileNames)
+
 	done := make(chan bool)
 	for i := 0; i < numIterations; i++ {
 		//Set Up
-		// Always use Parallel master
 		master := mr.NewParallelMaster(jobName, inputFileNames, reducers, mapF, reduceF)
 		setupMaster(master, done)
 		registerWorkers(numMappers, jobName, done)
 
-		//Do Map, Do Reduce, Do Merge
 		tempOutputFile := master.Merge()
 		//Update input files
 		updateInputs(inputFileNames, tempOutputFile, pageLinks)
 		cleanUp(jobName, int(reducers), numMappers)
 	}
 
+	//Clean up copied inputs
+	err := os.RemoveAll(fmt.Sprintf("%stmp/", mr.DataOutputDir))
+	checkErr(err, "Failed to remove temporary data input folder")
 }
 
+//setupMaster sets up a ParallelMaster
+//Credit to Sergio
 func setupMaster(master *mr.ParallelMaster, done chan bool) {
 	go func() {
 		master.Start()
@@ -134,10 +138,14 @@ func setupMaster(master *mr.ParallelMaster, done chan bool) {
 	}()
 }
 
+//copyInputs copy the input files into a /tmp folder in the data output dir.
+//It returns the modifled input file names
 func copyInputs(fNames []string) []string {
 	fileCopies := make([]string, 0, len(fNames))
-	err := os.Mkdir(fmt.Sprintf("%s/tmp", mr.DataInputDir), 0777)
+
+	err := os.Mkdir(fmt.Sprintf("%s/tmp", mr.DataOutputDir), 0777)
 	checkErr(err, "Failed to create tmp direcotry for input")
+
 	for _, fN := range fNames {
 		src, err := os.Open(fN)
 		fCopy := inputCopyName(fN)
@@ -145,6 +153,7 @@ func copyInputs(fNames []string) []string {
 
 		_, err = io.Copy(dst, src)
 		checkErr(err, fmt.Sprintf("Failed to copy input files %s", fN))
+
 		src.Close()
 		dst.Close()
 		fileCopies = append(fileCopies, fCopy)
@@ -153,11 +162,13 @@ func copyInputs(fNames []string) []string {
 	return fileCopies
 }
 
+//inputCopyName builds the copied input file names of the tmp/ folder
 func inputCopyName(o string) string {
-	dir, fileN := filepath.Split(o)
-	return fmt.Sprintf("%stmp/%s", dir, fileN)
+	_, fileN := filepath.Split(o)
+	return fmt.Sprintf("%stmp/%s", mr.DataOutputDir, fileN)
 }
 
+//registerWorkers register numMappers of workers
 //Ack: Based on test_test.go
 func registerWorkers(numMappers int, job string, done chan bool) {
 
@@ -175,6 +186,9 @@ func registerWorkers(numMappers int, job string, done chan bool) {
 	<-done
 }
 
+//processLinks parsed the outbound links of each page and store them in a map
+//This is to faciliate the process of updating intermediary inputs so that
+//only the PRs of each page needs to be read.
 func processLinks(inputs []string) map[string]string {
 	links := make(map[string]string)
 
@@ -182,6 +196,7 @@ func processLinks(inputs []string) map[string]string {
 		f, err := os.Open(fileName)
 		checkErr(err, "Failed to open file for preocessing links: ", fileName)
 		defer f.Close()
+
 		sc := bufio.NewScanner(f)
 
 		for sc.Scan() {
@@ -194,13 +209,14 @@ func processLinks(inputs []string) map[string]string {
 	return links
 }
 
+//updateInputs update the intermediary inputs, with the newly computed PRs
 func updateInputs(inputFileNames []string, tempOutputFile string, pageLinks map[string]string) {
 
 	curPRs := make(map[string]string)
 
 	//Read Current PRs
 	file, err := os.Open(tempOutputFile)
-	checkErr(err, "Failed open temp output file")
+	checkErr(err, "Failed open tmp output file")
 
 	sc := bufio.NewScanner(file)
 	for sc.Scan() {
@@ -233,7 +249,9 @@ func updateInputs(inputFileNames []string, tempOutputFile string, pageLinks map[
 	}
 }
 
+//cleanUp cleans up each mapper's output files after one iteration.
 func cleanUp(jobName string, numReducers, numMappers int) {
+	//Clean up temporary mapper output
 	for i := 0; i < numReducers; i++ {
 		for k := 0; k < numMappers; k++ {
 			fN := reduceInputName(jobName, k, i)
@@ -243,13 +261,14 @@ func cleanUp(jobName string, numReducers, numMappers int) {
 	}
 }
 
+//reduceInputName is a copy of the private method in the mr package
 func reduceInputName(jobName string, mapperNum, reducerNum int) string {
 	return mr.DataOutputDir + "mr." + jobName + "-" +
 		strconv.Itoa(mapperNum) + "-" + strconv.Itoa(reducerNum)
 
 }
 
-// A convenience function. Checks whether some error is nil. If it not, i.e.,
+//checkErr is A convenience function. Checks whether some error is nil. If it not, i.e.,
 // there is an error, panics with the error along with the message `msg`.
 func checkErr(err error, msg ...string) {
 	if err != nil {

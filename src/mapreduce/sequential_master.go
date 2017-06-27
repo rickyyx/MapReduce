@@ -50,10 +50,6 @@ func (m *SequentialMaster) Start() {
 		w.DoReduce(i, uint(1))
 	}
 	w.Shutdown()
-
-	// FIXME: Create a single worker and ask it to perform all of the map tasks
-	// followed by all of the reduce tasks. There is one map task per input
-	// file, and `m.NumReducers` number of reduce tasks.
 }
 
 // Merges the output of all reduce tasks into one file. Returns the filename for

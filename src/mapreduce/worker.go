@@ -57,12 +57,14 @@ func (w *Worker) Start() {
 func (w *Worker) DoMap(inputFileName string, mapperNum, numReducers uint) {
 	fmt.Printf("MAP[%s:%d]: Processing '%s' for %d reducers.\n", w.jobName,
 		mapperNum, inputFileName, numReducers)
+
 	//read full content
 	inputFileContent, err := ioutil.ReadFile(inputFileName)
 	checkErr(err, fmt.Sprintf("[Map] Cannot read inputfile content: %s", inputFileName))
 
 	kvs := w.mapF(inputFileName, string(inputFileContent))
 	partitions := make([][]KeyValue, numReducers)
+
 	//partition the keys
 	for _, kv := range kvs {
 		reducerNum := (ihash(kv.Key)) % uint32(numReducers)
@@ -72,16 +74,14 @@ func (w *Worker) DoMap(inputFileName string, mapperNum, numReducers uint) {
 	//save to files
 	for reducerNum, xPartition := range partitions {
 		outputFileName := reduceInputName(w.jobName, mapperNum, uint(reducerNum))
+
 		outputFile, err := os.OpenFile(outputFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0755)
-		fmt.Printf("Map %d is writing to %s...\n", mapperNum, outputFileName)
-		//	outputFile, err := os.Create(outputFileName)
 		checkErr(err, "[Map] Cannot open map output file:")
 
 		enc := json.NewEncoder(outputFile)
 		for _, kv := range xPartition {
 			enc.Encode(kv)
 		}
-		//fmt.Printf("Map[%s:%d]: Writing to output file %s.\n", w.jobName, mapperNum, outputFileName)
 		outputFile.Close()
 	}
 
@@ -97,12 +97,12 @@ func (w *Worker) DoMap(inputFileName string, mapperNum, numReducers uint) {
 func (w *Worker) DoReduce(reducerNum, numMappers uint) {
 	fmt.Printf("REDUCE[%s:%d]: Reducing from %d mappers.\n", w.jobName,
 		reducerNum, numMappers)
+
 	//kvMap will keep all the key, val list
 	kvMap := make(map[string][]string)
 
 	// read from each mapper's output, each output is deserialized, and grouped together
 	for mapNumber := uint(0); mapNumber < numMappers; mapNumber++ {
-		//fmt.Printf("[Reduce]: reading inputs form mapper %d \n", mapNumber)
 		reducerInputFileName := reduceInputName(w.jobName, mapNumber, reducerNum)
 		file, err := os.Open(reducerInputFileName)
 		checkErr(err, "[Reduce] Cannot open input file :")
@@ -111,7 +111,6 @@ func (w *Worker) DoReduce(reducerNum, numMappers uint) {
 
 		var kv KeyValue
 		for err := decoder.Decode(&kv); err == nil; err = decoder.Decode(&kv) {
-			//fmt.Printf("Key : %v, Vale: %v\n", kv.Key, kv.Value)
 			key := kv.Key
 			val := kv.Value
 			kvMap[key] = append(kvMap[key], val)
@@ -121,17 +120,16 @@ func (w *Worker) DoReduce(reducerNum, numMappers uint) {
 	//Pass <Key, [Val]> into the reduce func, and stored
 	var opKvList []KeyValue
 	for key, vals := range kvMap {
-		fmt.Printf("Reducer %d is getting Key: %v with Value length %d\n", reducerNum, key, len(vals))
 		opKvList = append(opKvList, KeyValue{key, w.reduceF(key, vals)})
 	}
 
 	//get output name
 	rOutFileName := ReduceOutputName(w.jobName, reducerNum)
-	//oFile, err := os.OpenFile(rOutFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+
 	oFile, err := os.Create(rOutFileName)
-	//fmt.Printf("Reducer[%s:%d]: Writing to reducer output file %s...\n", w.jobName, reducerNum, rOutFileName)
 	checkErr(err, "[Reduce] Cannot create reducer output file :")
 	defer oFile.Close()
+
 	enc := json.NewEncoder(oFile)
 	for _, kv := range opKvList {
 		enc.Encode(kv)
