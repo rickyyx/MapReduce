@@ -45,3 +45,7 @@
 ```go
   mr.Run("wordcount", mapF, reduceF)
 ```
+
+
+###Acknowledgement
+Skeleton code credit to [Sergio](https://sergio.bz) from CS240 @ Stanford. 
